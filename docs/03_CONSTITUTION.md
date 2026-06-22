@@ -38,21 +38,22 @@ Templates requiring updates:
   - .specify/templates/tasks-template.md      - OK no change needed
       No article-specific references.
   - .specify/templates/constitution-template.md - OK no change (template)
-  - .opencode/command/*                       - PENDING
-      Directory not present yet; created later by
-      `specify init --here --ai opencode`. No outdated references to fix now.
+  - .opencode/commands/*                      - VERIFIED no change needed
+      Directory now exists (11 command files). All references use
+      `constitution.md` (lowercase) and contain no article-number
+      references that would go stale. No outdated references found.
 
 Runtime docs requiring updates:
   - docs/03_CONSTITUTION.md                  - UPDATED
       Mirror kept in sync with .specify/memory/constitution.md (both now
       carry v1.0.0).
-  - docs/02_PROMPTS.md (PROMPT 1)            - PENDING manual follow-up
-      Says "eight articles" but the constitution has nine. Recommend
-      rewording to "nine articles" and listing Article VIII (ready to grow)
-      and Article IX (English) explicitly.
-  - docs/01_GETTING_STARTED.md (line 276)    - PENDING manual follow-up
-      Says "nine articles" but its inline list omits Article VIII and splits
-      OCR out of Article I. Recommend aligning the list with the articles.
+  - docs/02_PROMPTS.md (PROMPT 1)            - RESOLVED
+      Reworded "eight articles" -> "nine articles"; list now covers all
+      nine articles including StorageProvider (Art. I), local-first (Art. VI),
+      ready-to-grow (Art. VIII), and English (Art. IX).
+  - docs/01_GETTING_STARTED.md (line 276)    - RESOLVED
+      Inline list aligned with the nine articles: OCR folded into Art. I,
+      Article VIII (ready to grow) added, Article IX (English) retained.
 
 Deferred items / TODOs: none.
   RATIFICATION_DATE is set to 2026-06-21 as the first formal ratification.
@@ -69,10 +70,8 @@ Flagged ambiguities (detailed in the final summary to the user):
   3. docs/03_CONSTITUTION.md and .specify/memory/constitution.md are
      intentionally duplicated. Both updated; recommend a single source of
      truth (or a generation/symlink step) to prevent future drift.
-  4. File-name casing: on disk the file is CONSTITUTION.md (uppercase) while
-     Spec Kit and the docs reference constitution.md (lowercase). On Windows
-     this is the same file; for cross-platform safety consider
-     `git mv .specify/memory/CONSTITUTION.md .specify/memory/constitution.md`.
+  4. File-name casing: VERIFIED — the file is already `constitution.md`
+     (lowercase) on disk and in git's index. No rename needed.
 ============================================================================
 -->
 

@@ -274,8 +274,10 @@ In the OpenCode TUI:
 ```
 …then paste **PROMPT 1**.
 **[YOU] Review:** confirm the agent's consolidated constitution keeps the nine articles (Clean
-Architecture, OCR as a replaceable detail, spec-first, tests, REST contracts, currency rule,
-simplicity, security, English convention). Fix if needed, then have it save.
+Architecture with OCR and storage as replaceable ports, spec-first, tests, versioned REST
+contracts, data/currency/normalization, simplicity and local-first, minimal security, ready
+to grow without over-engineering, English as working language). Fix if needed, then have it
+save.
 
 ## 2.2 — Specify the backend skeleton (Epic E1) [AGENT]
 

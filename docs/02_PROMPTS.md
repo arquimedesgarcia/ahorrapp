@@ -18,10 +18,12 @@
 ```
 Read docs/00_GLOBAL_DESIGN.md as the project's source of truth. Adopt and refine the
 constitution that already exists in .specify/memory/constitution.md. Do not replace it with a
-generic one: respect its eight articles (Clean Architecture in Go, OCR as a replaceable detail
-behind the OCRProvider interface, spec-first, tests, versioned REST/JSON contracts, mandatory
-currency per price observation, store/merchant extraction, product normalization,
-simplicity/cost, minimal security with JWT, and readiness to grow without over-engineering).
+generic one: respect its nine articles (Clean Architecture in Go with OCR as a replaceable
+detail behind the OCRProvider interface and StorageProvider as a replaceable S3-compatible
+port, spec-first, tests, versioned REST/JSON contracts, mandatory currency per price
+observation, store/merchant extraction, product normalization, simplicity/cost and local-first
+development, minimal security with JWT, readiness to grow without over-engineering, and English
+as the working language).
 Return the consolidated constitution and flag any ambiguity you detect.
 ```
 
