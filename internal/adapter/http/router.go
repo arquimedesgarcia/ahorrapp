@@ -7,7 +7,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-func NewRouter(healthHandler http.Handler) http.Handler {
+func NewRouter(healthHandler http.Handler, registerReceiptRoutes func(chi.Router)) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
@@ -18,6 +18,9 @@ func NewRouter(healthHandler http.Handler) http.Handler {
 		v1.Get("/health", func(w http.ResponseWriter, req *http.Request) {
 			healthHandler.ServeHTTP(w, req)
 		})
+		if registerReceiptRoutes != nil {
+			registerReceiptRoutes(v1)
+		}
 	})
 
 	return r

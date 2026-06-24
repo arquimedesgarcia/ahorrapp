@@ -15,6 +15,9 @@ type Config struct {
 	MinIOAccessKey string `env:"MINIO_ACCESS_KEY" envDefault:"minioadmin"`
 	MinIOSecretKey string `env:"MINIO_SECRET_KEY" envDefault:"minioadmin"`
 	MinIOBucket    string `env:"MINIO_BUCKET" envDefault:"receipts"`
+	MinIOUseSSL    bool   `env:"MINIO_USE_SSL" envDefault:"false"`
+	OCRBaseURL     string `env:"OCR_BASE_URL" envDefault:"http://localhost:8081"`
+	OCRQueueKey    string `env:"OCR_QUEUE_KEY" envDefault:"ocr:jobs"`
 	LogLevel       string `env:"LOG_LEVEL" envDefault:"info"`
 }
 

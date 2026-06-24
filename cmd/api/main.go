@@ -11,9 +11,12 @@ import (
 	"syscall"
 	"time"
 
+	"ahorrapp/internal/adapter/events"
 	httpapi "ahorrapp/internal/adapter/http"
+	"ahorrapp/internal/adapter/ocr"
 	"ahorrapp/internal/adapter/postgres"
 	"ahorrapp/internal/adapter/redis"
+	"ahorrapp/internal/adapter/storage"
 	"ahorrapp/internal/config"
 	"ahorrapp/internal/usecase"
 
@@ -41,13 +44,38 @@ func main() {
 	redisClient := redis.NewClient(cfg.RedisAddr, cfg.RedisPassword)
 	defer redisClient.Close()
 
+	storageClient, err := storage.NewClient(
+		cfg.MinIOEndpoint,
+		cfg.MinIOAccessKey,
+		cfg.MinIOSecretKey,
+		cfg.MinIOBucket,
+		cfg.MinIOUseSSL,
+	)
+	if err != nil {
+		log.Fatalf("init storage: %v", err)
+	}
+
+	ocrClient := ocr.NewClient(cfg.OCRBaseURL)
+
 	healthUC := usecase.NewHealthUseCase(
 		postgres.NewChecker(pgPool),
 		redis.NewChecker(redisClient),
 	)
+	receiptRepo := postgres.NewReceiptRepository(pgPool)
+	ocrQueue := redis.NewOCRQueue(redisClient, cfg.OCRQueueKey)
+	receiptUploadUC := usecase.NewReceiptUploadUseCase(receiptRepo, storageClient, ocrQueue)
+	receiptGetUC := usecase.NewReceiptGetUseCase(receiptRepo)
+	receiptConfirmUC := usecase.NewReceiptConfirmUseCase(receiptRepo, events.NewLogger())
+	receiptProcessUC := usecase.NewReceiptProcessUseCase(receiptRepo, ocrClient)
+	worker := usecase.NewReceiptWorker(ocrQueue, receiptProcessUC)
+
+	workerCtx, stopWorker := context.WithCancel(context.Background())
+	defer stopWorker()
+	go worker.Run(workerCtx)
 
 	healthHandler := httpapi.NewHealthHandler(healthUC)
-	router := httpapi.NewRouter(healthHandler)
+	receiptHandler := httpapi.NewReceiptHandler(receiptUploadUC, receiptGetUC, receiptConfirmUC)
+	router := httpapi.NewRouter(healthHandler, receiptHandler.RegisterRoutes)
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.ServerPort),
@@ -68,6 +96,7 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	stopWorker()
 	if err := server.Shutdown(ctx); err != nil {
 		log.Printf("graceful shutdown failed: %v", err)
 	}

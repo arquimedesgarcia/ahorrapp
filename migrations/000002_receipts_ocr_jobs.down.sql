@@ -1,0 +1,6 @@
+DROP TABLE IF EXISTS price_observations;
+DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS ocr_jobs;
+DROP TABLE IF EXISTS receipt_items;
+DROP TABLE IF EXISTS receipts;
+DROP TABLE IF EXISTS stores;

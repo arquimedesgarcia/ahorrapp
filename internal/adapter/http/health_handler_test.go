@@ -28,7 +28,7 @@ func TestHealthHandler_ReturnsStatusAndDependencies(t *testing.T) {
 	}}
 
 	h := NewHealthHandler(uc)
-	router := NewRouter(h)
+	router := NewRouter(h, nil)
 	ts := httptest.NewServer(router)
 	defer ts.Close()
 
