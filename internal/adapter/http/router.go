@@ -7,7 +7,14 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-func NewRouter(healthHandler http.Handler, registerReceiptRoutes func(chi.Router)) http.Handler {
+func NewRouter(
+	healthHandler http.Handler,
+	authHandler *AuthHandler,
+	profileHandler *ProfileHandler,
+	rankingHandler *RankingHandler,
+	registerReceiptRoutes func(chi.Router),
+	jwtMiddleware func(http.Handler) http.Handler,
+) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
@@ -15,12 +22,25 @@ func NewRouter(healthHandler http.Handler, registerReceiptRoutes func(chi.Router
 	r.Use(middleware.Recoverer)
 
 	r.Route("/api/v1", func(v1 chi.Router) {
+		// Public endpoints (no auth required)
 		v1.Get("/health", func(w http.ResponseWriter, req *http.Request) {
 			healthHandler.ServeHTTP(w, req)
 		})
-		if registerReceiptRoutes != nil {
-			registerReceiptRoutes(v1)
-		}
+		v1.Post("/auth/register", authHandler.Register)
+		v1.Post("/auth/login", authHandler.Login)
+
+		// Authenticated endpoints (JWT middleware required)
+		v1.Group(func(authed chi.Router) {
+			authed.Use(jwtMiddleware)
+
+			authed.Get("/auth/me", authHandler.Me)
+			authed.Get("/users/me/points", profileHandler.GetPoints)
+			authed.Get("/ranking/products/search", rankingHandler.Search)
+
+			if registerReceiptRoutes != nil {
+				registerReceiptRoutes(authed)
+			}
+		})
 	})
 
 	return r

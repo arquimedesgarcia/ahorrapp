@@ -6,9 +6,18 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"ahorrapp/internal/domain/ports"
 	"ahorrapp/internal/usecase"
 )
+
+type stubTokenService struct{}
+
+func (stubTokenService) Generate(string, string) (string, error) { return "stub", nil }
+func (stubTokenService) Validate(string) (*ports.TokenClaims, error) {
+	return &ports.TokenClaims{UserID: "test-user", ExpiresAt: time.Now().Add(time.Hour)}, nil
+}
 
 type fakeHealthUseCase struct {
 	response usecase.HealthResponse
@@ -28,7 +37,14 @@ func TestHealthHandler_ReturnsStatusAndDependencies(t *testing.T) {
 	}}
 
 	h := NewHealthHandler(uc)
-	router := NewRouter(h, nil)
+	router := NewRouter(
+		h,
+		NewAuthHandler(nil),
+		NewProfileHandler(nil),
+		NewRankingHandler(),
+		nil,
+		JWTMiddleware(stubTokenService{}),
+	)
 	ts := httptest.NewServer(router)
 	defer ts.Close()
 

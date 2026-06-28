@@ -11,8 +11,10 @@ import (
 	"syscall"
 	"time"
 
+	"ahorrapp/internal/adapter/crypto"
 	"ahorrapp/internal/adapter/events"
 	httpapi "ahorrapp/internal/adapter/http"
+	"ahorrapp/internal/adapter/jwt"
 	"ahorrapp/internal/adapter/ocr"
 	"ahorrapp/internal/adapter/postgres"
 	"ahorrapp/internal/adapter/redis"
@@ -45,23 +47,24 @@ func main() {
 	defer redisClient.Close()
 
 	storageClient, err := storage.NewClient(
-		cfg.MinIOEndpoint,
-		cfg.MinIOAccessKey,
-		cfg.MinIOSecretKey,
-		cfg.MinIOBucket,
-		cfg.MinIOUseSSL,
+		cfg.S3Endpoint,
+		cfg.S3AccessKey,
+		cfg.S3SecretKey,
+		cfg.S3Bucket,
+		cfg.S3UseSSL,
 	)
 	if err != nil {
 		log.Fatalf("init storage: %v", err)
 	}
 
-	ocrClient := ocr.NewClient(cfg.OCRBaseURL)
+	ocrClient := ocr.NewPaddleOCRProvider(cfg.OCRBaseURL)
 
 	healthUC := usecase.NewHealthUseCase(
 		postgres.NewChecker(pgPool),
 		redis.NewChecker(redisClient),
 	)
 	receiptRepo := postgres.NewReceiptRepository(pgPool)
+	userRepo := postgres.NewUserRepository(pgPool)
 	ocrQueue := redis.NewOCRQueue(redisClient, cfg.OCRQueueKey)
 	receiptUploadUC := usecase.NewReceiptUploadUseCase(receiptRepo, storageClient, ocrQueue)
 	receiptGetUC := usecase.NewReceiptGetUseCase(receiptRepo)
@@ -73,9 +76,25 @@ func main() {
 	defer stopWorker()
 	go worker.Run(workerCtx)
 
+	// Auth and profile wiring (E2)
+	bcryptHasher := crypto.NewBcryptHasher()
+	tokenService := jwt.NewTokenService(cfg.JWTSecret)
+	authUC := usecase.NewAuthUseCase(userRepo, bcryptHasher, tokenService)
+	profileUC := usecase.NewProfileUseCase(userRepo)
+
 	healthHandler := httpapi.NewHealthHandler(healthUC)
+	authHandler := httpapi.NewAuthHandler(authUC)
+	profileHandler := httpapi.NewProfileHandler(profileUC)
+	rankingHandler := httpapi.NewRankingHandler()
 	receiptHandler := httpapi.NewReceiptHandler(receiptUploadUC, receiptGetUC, receiptConfirmUC)
-	router := httpapi.NewRouter(healthHandler, receiptHandler.RegisterRoutes)
+	router := httpapi.NewRouter(
+		healthHandler,
+		authHandler,
+		profileHandler,
+		rankingHandler,
+		receiptHandler.RegisterRoutes,
+		httpapi.JWTMiddleware(tokenService),
+	)
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.ServerPort),

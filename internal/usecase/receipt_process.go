@@ -31,7 +31,7 @@ func (u *ReceiptProcessUseCase) Execute(ctx context.Context, receiptID string) e
 		return err
 	}
 
-	summary := ParseOCRText(raw)
+	summary := ParseOCRText(raw.RawText)
 	summary.ReceiptID = receipt.ID
 	summary.Status = entities.ReceiptStatusNeedsReview
 	if summary.Store.Name == "" {

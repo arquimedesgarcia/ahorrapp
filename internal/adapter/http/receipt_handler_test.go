@@ -32,7 +32,7 @@ func (s confirmStub) Execute(context.Context, string, string, entities.ConfirmPa
 
 func TestReceiptUploadHandler_AcceptsMultipart(t *testing.T) {
 	h := NewReceiptHandler(uploadStub{}, getStub{}, confirmStub{})
-	router := NewRouter(NewHealthHandler(fakeHealthUseCase{}), h.RegisterRoutes)
+	router := newTestRouter(NewHealthHandler(fakeHealthUseCase{}), h.RegisterRoutes)
 
 	var body bytes.Buffer
 	w := multipart.NewWriter(&body)

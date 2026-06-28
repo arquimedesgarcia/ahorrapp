@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"net/url"
 	"strings"
+	"time"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -59,10 +59,9 @@ func (c *Client) Upload(ctx context.Context, objectName string, data []byte) (st
 		return "", err
 	}
 
-	scheme := "http"
-	if c.useSSL {
-		scheme = "https"
+	presigned, err := c.client.PresignedGetObject(ctx, c.bucket, objectName, 15*time.Minute, nil)
+	if err != nil {
+		return "", err
 	}
-	u := url.URL{Scheme: scheme, Host: c.endpoint, Path: fmt.Sprintf("/%s/%s", c.bucket, objectName)}
-	return u.String(), nil
+	return presigned.String(), nil
 }

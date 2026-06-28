@@ -18,7 +18,7 @@
 
 **Purpose**: Create feature scaffolding and shared contracts
 
-- [ ] T001 Create receipt feature HTTP route scaffold in `internal/adapter/http/receipt_routes.go`
+- [x] T001 Create receipt feature HTTP route scaffold in `internal/adapter/http/receipt_routes.go`
 - [x] T002 Create receipt domain entities scaffold in `internal/domain/entities/receipt.go`
 - [x] T003 [P] Create OCR parsing fixture directory with sample placeholder files in `internal/usecase/fixtures/ocr/`
 - [x] T004 [P] Add feature migration index notes in `migrations/README.md`
@@ -53,7 +53,7 @@
 ### Tests for User Story 1
 
 - [x] T013 [P] [US1] Add unit tests for upload use case including duplicate-idempotency in `internal/usecase/receipt_upload_test.go`
-- [ ] T014 [P] [US1] Add integration tests for `POST /api/v1/receipts` happy path and duplicate path in `internal/adapter/http/receipt_upload_handler_test.go`
+- [x] T014 [P] [US1] Add integration tests for `POST /api/v1/receipts` happy path and duplicate path in `internal/adapter/http/receipt_upload_handler_test.go`
 
 ### Implementation for User Story 1
 
@@ -74,8 +74,8 @@
 
 ### Tests for User Story 2
 
-- [ ] T019 [P] [US2] Add unit tests for OCR processing and parsing state transition rules in `internal/usecase/receipt_process_test.go`
-- [ ] T020 [P] [US2] Add integration tests for `GET /api/v1/receipts/{id}` editable response in `internal/adapter/http/receipt_get_handler_test.go`
+- [x] T019 [P] [US2] Add unit tests for OCR processing and parsing state transition rules in `internal/usecase/receipt_process_test.go`
+- [x] T020 [P] [US2] Add integration tests for `GET /api/v1/receipts/{id}` editable response in `internal/adapter/http/receipt_get_handler_test.go`
 
 ### Implementation for User Story 2
 
@@ -99,14 +99,14 @@
 ### Tests for User Story 3
 
 - [x] T027 [P] [US3] Add unit tests for confirmation validation and observation creation in `internal/usecase/receipt_confirm_test.go`
-- [ ] T028 [P] [US3] Add integration tests for `POST /api/v1/receipts/{id}/confirm` success and missing-currency failure in `internal/adapter/http/receipt_confirm_handler_test.go`
+- [x] T028 [P] [US3] Add integration tests for `POST /api/v1/receipts/{id}/confirm` success and missing-currency failure in `internal/adapter/http/receipt_confirm_handler_test.go`
 
 ### Implementation for User Story 3
 
 - [x] T029 [US3] Implement receipt confirmation use case with atomic persistence in `internal/usecase/receipt_confirm.go`
-- [ ] T030 [US3] Implement canonical product normalization bridge in `internal/usecase/product_normalizer.go`
-- [ ] T031 [US3] Implement `PriceObservation` persistence with mandatory currency constraint in `internal/adapter/postgres/price_observation_repository.go`
-- [ ] T032 [US3] Implement unknown-merchant create/associate behavior in confirmation flow in `internal/usecase/store_resolution.go`
+- [x] T030 [US3] Implement canonical product normalization bridge in `internal/usecase/product_normalizer.go`
+- [x] T031 [US3] Implement `PriceObservation` persistence with mandatory currency constraint in `internal/adapter/postgres/price_observation_repository.go`
+- [x] T032 [US3] Implement unknown-merchant create/associate behavior in confirmation flow in `internal/usecase/store_resolution.go`
 - [x] T033 [US3] Implement downstream event emission port calls (points + aggregate recompute) in `internal/usecase/receipt_confirm.go`
 - [x] T034 [US3] Implement `POST /api/v1/receipts/{id}/confirm` handler in `internal/adapter/http/receipt_confirm_handler.go`
 - [x] T035 [US3] Register confirm route in `internal/adapter/http/receipt_routes.go`
@@ -119,11 +119,11 @@
 
 **Purpose**: End-to-end hardening, observability, and contract consistency
 
-- [ ] T036 [P] Add structured logs/metrics around OCR job lifecycle and receipt transitions in `internal/usecase/receipt_worker.go`
-- [ ] T037 [P] Add retry/backoff and dead-letter handling policy for OCR jobs in `internal/adapter/redis/ocr_queue.go`
-- [ ] T038 [P] Update API contract examples and error payloads for final behavior in `specs/002-receipt-ocr-review/contracts/receipt-api-contract.md`
-- [ ] T039 Update quickstart validation steps to match final implementation and edge cases in `specs/002-receipt-ocr-review/quickstart.md`
-- [ ] T040 Run end-to-end validation checklist and record evidence in `specs/002-receipt-ocr-review/quickstart.md`
+- [x] T036 [P] Add structured logs/metrics around OCR job lifecycle and receipt transitions in `internal/usecase/receipt_worker.go`
+- [x] T037 [P] Add retry/backoff and dead-letter handling policy for OCR jobs in `internal/adapter/redis/ocr_queue.go`
+- [x] T038 [P] Update API contract examples and error payloads for final behavior in `specs/002-receipt-ocr-review/contracts/receipt-api-contract.md`
+- [x] T039 Update quickstart validation steps to match final implementation and edge cases in `specs/002-receipt-ocr-review/quickstart.md`
+- [x] T040 Run end-to-end validation checklist and record evidence in `specs/002-receipt-ocr-review/quickstart.md`
 
 ---
 

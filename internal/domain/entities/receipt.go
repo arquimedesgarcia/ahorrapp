@@ -55,14 +55,14 @@ type OCRJob struct {
 }
 
 type EditableSummary struct {
-	ReceiptID     string
-	Status        ReceiptStatus
-	Store         StoreSummary
-	PurchaseDate  *string
-	Total         *float64
-	Items         []EditableItem
-	Duplicate     bool
-	DuplicateOfID *string
+	ReceiptID     string         `json:"receipt_id"`
+	Status        ReceiptStatus  `json:"status"`
+	Store         StoreSummary   `json:"store"`
+	PurchaseDate  *string        `json:"purchase_date,omitempty"`
+	Total         *float64       `json:"total,omitempty"`
+	Items         []EditableItem `json:"items"`
+	Duplicate     bool           `json:"duplicate"`
+	DuplicateOfID *string        `json:"duplicate_of_id,omitempty"`
 }
 
 type StoreSummary struct {
