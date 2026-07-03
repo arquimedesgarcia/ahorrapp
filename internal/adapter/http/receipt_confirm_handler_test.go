@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"ahorrapp/internal/domain/entities"
@@ -26,17 +27,17 @@ func (s getDummyStub) Execute(context.Context, string, string) (*entities.Editab
 
 type confirmConditionalStub struct{}
 
-func (s confirmConditionalStub) Execute(_ context.Context, _ string, _ string, payload entities.ConfirmPayload) error {
+func (s confirmConditionalStub) Execute(_ context.Context, _ string, _ string, payload entities.ConfirmPayload) (usecase.ConfirmResult, error) {
 	for i, item := range payload.Items {
 		if item.Currency == nil || *item.Currency == "" {
-			return fmt.Errorf("items[%d].currency missing", i)
+			return usecase.ConfirmResult{}, fmt.Errorf("items[%d].currency missing", i)
 		}
 	}
-	return nil
+	return usecase.ConfirmResult{}, nil
 }
 
 func TestReceiptConfirmHandler_SuccessAndMissingCurrency(t *testing.T) {
-	h := NewReceiptHandler(uploadDummyStub{}, getDummyStub{}, confirmConditionalStub{})
+	h := NewReceiptHandler(uploadDummyStub{}, getDummyStub{}, listNoopStub{}, confirmConditionalStub{})
 	router := newTestRouter(NewHealthHandler(fakeHealthUseCase{}), h.RegisterRoutes)
 
 	goodBody := []byte(`{"store":{"name":"Store"},"purchase_date":"2026-06-24","total":1.0,"items":[{"raw_text":"PAN","quantity":1,"unit_price":1.0,"currency":"USD"}]}`)
@@ -45,8 +46,11 @@ func TestReceiptConfirmHandler_SuccessAndMissingCurrency(t *testing.T) {
 	goodReq.Header.Set("Content-Type", "application/json")
 	goodRR := httptest.NewRecorder()
 	router.ServeHTTP(goodRR, goodReq)
-	if goodRR.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d", goodRR.Code)
+	if goodRR.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (body: %s)", goodRR.Code, goodRR.Body.String())
+	}
+	if !strings.Contains(goodRR.Body.String(), "points_earned") {
+		t.Errorf("expected body to contain points_earned, got %s", goodRR.Body.String())
 	}
 
 	badBody := []byte(`{"store":{"name":"Store"},"purchase_date":"2026-06-24","total":1.0,"items":[{"raw_text":"PAN","quantity":1,"unit_price":1.0}]}`)

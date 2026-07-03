@@ -83,7 +83,7 @@ func (r *UserRepository) GetPoints(ctx context.Context, userID string) (int, err
 
 func (r *UserRepository) RecentTransactions(ctx context.Context, userID string, limit int) ([]entities.LoyaltyTransaction, error) {
 	rows, err := r.pool.Query(ctx, `
-SELECT id::text, user_id::text, points, reason, created_at
+SELECT id::text, user_id::text, points, reason, created_at, receipt_id::text
 FROM loyalty_transactions
 WHERE user_id::text = $1
 ORDER BY created_at DESC
@@ -97,7 +97,7 @@ LIMIT $2
 	var out []entities.LoyaltyTransaction
 	for rows.Next() {
 		var tx entities.LoyaltyTransaction
-		if err := rows.Scan(&tx.ID, &tx.UserID, &tx.Points, &tx.Reason, &tx.CreatedAt); err != nil {
+		if err := rows.Scan(&tx.ID, &tx.UserID, &tx.Points, &tx.Reason, &tx.CreatedAt, &tx.ReceiptID); err != nil {
 			return nil, fmt.Errorf("scan transaction: %w", err)
 		}
 		out = append(out, tx)

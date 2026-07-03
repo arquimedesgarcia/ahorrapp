@@ -40,14 +40,18 @@ class ApiClient {
     final dio = Dio(
       BaseOptions(
         baseUrl: baseUrl ?? _defaultBaseUrl,
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 30),
-        sendTimeout: const Duration(seconds: 30),
+        // Short timeouts for a LAN-local backend. A 30s receiveTimeout
+        // combined with the retry interceptor's 1+2+4s backoff meant a
+        // single unreachable host could take ~2 minutes to surface a
+        // failure to the user.
+        connectTimeout: const Duration(seconds: 5),
+        receiveTimeout: const Duration(seconds: 8),
+        sendTimeout: const Duration(seconds: 5),
         headers: {'Content-Type': 'application/json'},
       ),
     );
     dio.interceptors.add(AuthInterceptor(storage));
-    dio.interceptors.add(RetryInterceptor(dio: dio));
+    dio.interceptors.add(RetryInterceptor(dio: dio, maxRetries: 2));
     if (kDebugMode) {
       dio.interceptors.add(
         LogInterceptor(requestBody: true, responseBody: true, error: true),

@@ -16,5 +16,6 @@ func NewStoreResolver(repo ports.ReceiptRepository) *StoreResolver {
 }
 
 func (r *StoreResolver) Resolve(ctx context.Context, store entities.StoreSummary) (string, error) {
-	return r.repo.ResolveOrCreateStore(ctx, store)
+	id, _, err := r.repo.ResolveOrCreateStore(ctx, store)
+	return id, err
 }

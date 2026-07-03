@@ -41,6 +41,10 @@ services:
       context: ./ocr-service
       dockerfile: Dockerfile
     container_name: ahorrapp-ocr
+    environment:
+      OCR_LANG: ${OCR_LANG:-en}
+    volumes:
+      - ocr_models:/root/.paddleocr
     ports:
       - "8081:8081"
 
@@ -62,3 +66,6 @@ services:
         condition: service_started
       ocr:
         condition: service_started
+
+volumes:
+  ocr_models:

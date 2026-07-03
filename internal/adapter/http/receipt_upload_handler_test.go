@@ -33,13 +33,13 @@ func (s staticGetStub) Execute(context.Context, string, string) (*entities.Edita
 
 type staticConfirmStub struct{}
 
-func (s staticConfirmStub) Execute(context.Context, string, string, entities.ConfirmPayload) error {
-	return nil
+func (s staticConfirmStub) Execute(context.Context, string, string, entities.ConfirmPayload) (usecase.ConfirmResult, error) {
+	return usecase.ConfirmResult{}, nil
 }
 
 func TestReceiptUploadHandler_HappyAndDuplicate(t *testing.T) {
 	upload := &uploadSequenceStub{}
-	h := NewReceiptHandler(upload, staticGetStub{}, staticConfirmStub{})
+	h := NewReceiptHandler(upload, staticGetStub{}, listNoopStub{}, staticConfirmStub{})
 	router := newTestRouter(NewHealthHandler(fakeHealthUseCase{}), h.RegisterRoutes)
 
 	first := doUploadRequest(t, router)

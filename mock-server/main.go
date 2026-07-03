@@ -35,6 +35,7 @@ func main() {
 
 	// Profile
 	mux.HandleFunc("/api/v1/users/me/points", cors(points))
+	mux.HandleFunc("/api/v1/me/loyalty", cors(loyalty))
 
 	// Health
 	mux.HandleFunc("/api/v1/health", cors(func(w http.ResponseWriter, r *http.Request) {
@@ -334,6 +335,40 @@ func points(w http.ResponseWriter, r *http.Request) {
 				"points":     10,
 				"reason":     "Receipt confirmed",
 				"created_at": time.Now().Add(-48 * time.Hour).Format(time.RFC3339),
+			},
+		},
+	})
+}
+
+// loyalty serves GET /api/v1/me/loyalty — canonical endpoint introduced by
+// spec 006-loyalty-points. Returns the richer { balance, history[] } shape;
+// the legacy /users/me/points handler above keeps its own shape.
+func loyalty(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		errJSON(w, 405, "method not allowed")
+		return
+	}
+	if emailFromAuth(r) == "" {
+		errJSON(w, 401, "invalid or expired token")
+		return
+	}
+	now := time.Now()
+	writeJSON(w, 200, kv{
+		"balance": 350,
+		"history": []kv{
+			{
+				"id":         "tx-002",
+				"points":     18,
+				"reason":     "receipt_confirmed;first_observation_product;data_completion",
+				"created_at": now.Add(-24 * time.Hour).Format(time.RFC3339),
+				"receipt_id": "rc-002",
+			},
+			{
+				"id":         "tx-001",
+				"points":     10,
+				"reason":     "receipt_confirmed",
+				"created_at": now.Add(-48 * time.Hour).Format(time.RFC3339),
+				"receipt_id": "rc-001",
 			},
 		},
 	})

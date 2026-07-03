@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"ahorrapp/internal/domain/entities"
@@ -141,6 +142,57 @@ WHERE id = $1::uuid
 	return &out, nil
 }
 
+func (r *ReceiptRepository) ListByUser(ctx context.Context, userID string, limit, offset int) ([]entities.ReceiptListItem, error) {
+	rows, err := r.pool.Query(ctx, `
+SELECT
+  r.id::text,
+  r.status,
+  COALESCE(s.name, ''),
+  r.purchase_date::text,
+  r.total,
+  COALESCE(item_counts.cnt, 0),
+  r.created_at,
+  r.image_url
+FROM receipts r
+LEFT JOIN stores s ON s.id = r.store_id
+LEFT JOIN (
+  SELECT receipt_id, COUNT(*)::int AS cnt
+  FROM receipt_items
+  GROUP BY receipt_id
+) item_counts ON item_counts.receipt_id = r.id
+WHERE r.user_id::text = $1
+ORDER BY r.created_at DESC
+LIMIT $2 OFFSET $3
+`, userID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("list receipts: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]entities.ReceiptListItem, 0, limit)
+	for rows.Next() {
+		var item entities.ReceiptListItem
+		var status string
+		var purchaseDate *string
+		if err := rows.Scan(
+			&item.ID,
+			&status,
+			&item.StoreName,
+			&purchaseDate,
+			&item.Total,
+			&item.ItemCount,
+			&item.CreatedAt,
+			&item.ImageURL,
+		); err != nil {
+			return nil, fmt.Errorf("scan receipt list item: %w", err)
+		}
+		item.Status = entities.ReceiptStatus(status)
+		item.PurchaseDate = purchaseDate
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
 func (r *ReceiptRepository) MarkNeedsReview(ctx context.Context, receiptID string, summary entities.EditableSummary) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -148,7 +200,7 @@ func (r *ReceiptRepository) MarkNeedsReview(ctx context.Context, receiptID strin
 	}
 	defer tx.Rollback(ctx)
 
-	storeID, err := r.resolveOrCreateStoreTx(ctx, tx, summary.Store)
+	storeID, _, err := r.resolveOrCreateStoreTx(ctx, tx, summary.Store)
 	if err != nil {
 		return err
 	}
@@ -194,7 +246,7 @@ func (r *ReceiptRepository) ConfirmReceipt(ctx context.Context, receiptID, userI
 	}
 	defer tx.Rollback(ctx)
 
-	storeID, err := r.resolveOrCreateStoreTx(ctx, tx, payload.Store)
+	storeID, _, err := r.resolveOrCreateStoreTx(ctx, tx, payload.Store)
 	if err != nil {
 		return err
 	}
@@ -238,7 +290,7 @@ VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6::uuid)
 	return tx.Commit(ctx)
 }
 
-func (r *ReceiptRepository) ResolveOrCreateStore(ctx context.Context, store entities.StoreSummary) (string, error) {
+func (r *ReceiptRepository) ResolveOrCreateStore(ctx context.Context, store entities.StoreSummary) (string, bool, error) {
 	return r.resolveOrCreateStoreTx(ctx, r.pool, store)
 }
 
@@ -250,7 +302,7 @@ type dbtx interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
-func (r *ReceiptRepository) resolveOrCreateStoreTx(ctx context.Context, q dbtx, store entities.StoreSummary) (string, error) {
+func (r *ReceiptRepository) resolveOrCreateStoreTx(ctx context.Context, q dbtx, store entities.StoreSummary) (string, bool, error) {
 	name := strings.TrimSpace(store.Name)
 	if name == "" {
 		name = "Unknown"
@@ -265,10 +317,10 @@ LIMIT 1
 	var existing string
 	err := row.Scan(&existing)
 	if err == nil {
-		return existing, nil
+		return existing, false, nil
 	}
 	if err != pgx.ErrNoRows {
-		return "", err
+		return "", false, err
 	}
 
 	insert := q.QueryRow(ctx, `
@@ -279,9 +331,9 @@ RETURNING id::text
 
 	var storeID string
 	if err := insert.Scan(&storeID); err != nil {
-		return "", err
+		return "", false, err
 	}
-	return storeID, nil
+	return storeID, true, nil
 }
 
 func (r *ReceiptRepository) normalizeProductTx(ctx context.Context, q dbtx, rawName string) (string, string, error) {

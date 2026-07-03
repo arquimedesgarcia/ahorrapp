@@ -9,12 +9,16 @@ class ProfileState {
   const ProfileState({
     this.status = ProfileStatus.loading,
     this.totalPoints = 0,
+    this.level = 'Bronce',
+    this.contributor = const ContributorStats(),
     this.recentTransactions = const [],
     this.errorMessage,
   });
 
   final ProfileStatus status;
   final int totalPoints;
+  final String level;
+  final ContributorStats contributor;
   final List<PointsTransaction> recentTransactions;
   final String? errorMessage;
 }
@@ -31,6 +35,8 @@ class ProfileNotifier extends StateNotifier<ProfileState> {
       state = ProfileState(
         status: ProfileStatus.ready,
         totalPoints: response.totalPoints,
+        level: response.level,
+        contributor: response.contributor,
         recentTransactions: response.recentTransactions,
       );
     } on Exception catch (e) {

@@ -11,9 +11,13 @@ type ReceiptRepository interface {
 	CreatePendingReceipt(ctx context.Context, userID, imageURL, imageHash string) (*entities.Receipt, error)
 	GetByIDForUser(ctx context.Context, receiptID, userID string) (*entities.EditableSummary, error)
 	GetByID(ctx context.Context, receiptID string) (*entities.Receipt, error)
+	ListByUser(ctx context.Context, userID string, limit, offset int) ([]entities.ReceiptListItem, error)
 	MarkNeedsReview(ctx context.Context, receiptID string, summary entities.EditableSummary) error
 	ConfirmReceipt(ctx context.Context, receiptID, userID string, payload entities.ConfirmPayload, observations []entities.PriceObservation) error
-	ResolveOrCreateStore(ctx context.Context, store entities.StoreSummary) (string, error)
+	// ResolveOrCreateStore returns (storeID, created, error). created is true
+	// when this call inserted a brand-new store row, used by the loyalty
+	// award use case to grant the first-observation-store bonus.
+	ResolveOrCreateStore(ctx context.Context, store entities.StoreSummary) (string, bool, error)
 	NormalizeProduct(ctx context.Context, rawName string) (string, string, error)
 }
 

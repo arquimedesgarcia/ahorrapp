@@ -33,11 +33,14 @@ func (s *processRepoStub) MarkNeedsReview(_ context.Context, _ string, summary e
 func (s *processRepoStub) ConfirmReceipt(context.Context, string, string, entities.ConfirmPayload, []entities.PriceObservation) error {
 	panic("not used")
 }
-func (s *processRepoStub) ResolveOrCreateStore(context.Context, entities.StoreSummary) (string, error) {
+func (s *processRepoStub) ResolveOrCreateStore(context.Context, entities.StoreSummary) (string, bool, error) {
 	panic("not used")
 }
 func (s *processRepoStub) NormalizeProduct(context.Context, string) (string, string, error) {
-	panic("not used")
+	return "p-1", "milk", nil
+}
+func (s *processRepoStub) ListByUser(context.Context, string, int, int) ([]entities.ReceiptListItem, error) {
+	return nil, nil
 }
 
 type ocrStub struct{ text string }

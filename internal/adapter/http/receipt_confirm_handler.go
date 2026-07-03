@@ -24,10 +24,14 @@ func (h *ReceiptHandler) confirmReceipt(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := h.confirm.Execute(r.Context(), id, userID, payload); err != nil {
+	result, err := h.confirm.Execute(r.Context(), id, userID, payload)
+	if err != nil {
 		http.Error(w, fmt.Sprintf("confirm receipt: %v", err), http.StatusBadRequest)
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"points_earned": result.PointsEarned,
+		"reasons":       result.Reasons,
+	})
 }

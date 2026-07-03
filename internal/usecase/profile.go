@@ -8,15 +8,18 @@ import (
 )
 
 type ProfileUseCase struct {
-	users ports.UserRepository
+	users   ports.UserRepository
+	loyalty ports.LoyaltyRepository
 }
 
-func NewProfileUseCase(users ports.UserRepository) *ProfileUseCase {
-	return &ProfileUseCase{users: users}
+func NewProfileUseCase(users ports.UserRepository, loyalty ports.LoyaltyRepository) *ProfileUseCase {
+	return &ProfileUseCase{users: users, loyalty: loyalty}
 }
 
 type PointsResponse struct {
 	TotalPoints        int                    `json:"total_points"`
+	Level              string                 `json:"level"`
+	Contributor        ContributorOut         `json:"contributor"`
 	RecentTransactions []RecentTransactionOut `json:"recent_transactions"`
 }
 
@@ -38,7 +41,21 @@ func (u *ProfileUseCase) GetPoints(ctx context.Context, userID string) (*PointsR
 		txs = nil
 	}
 
-	resp := &PointsResponse{TotalPoints: points}
+	stats, err := u.loyalty.ContributorStats(ctx, userID)
+	if err != nil {
+		stats = ports.ContributorStats{}
+	}
+
+	resp := &PointsResponse{
+		TotalPoints: points,
+		Level:       levelFor(points),
+		Contributor: ContributorOut{
+			ReceiptsConfirmed: stats.ReceiptsConfirmed,
+			PriceObservations: stats.PriceObservations,
+			UniqueStores:      stats.UniqueStores,
+			UniqueProducts:    stats.UniqueProducts,
+		},
+	}
 	resp.RecentTransactions = toRecentTxOuts(txs)
 	return resp, nil
 }

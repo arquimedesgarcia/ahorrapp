@@ -68,6 +68,27 @@ class ReceiptApiClient {
     }
   }
 
+  Future<ReceiptListResponse> listReceipts({
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    try {
+      final response = await _apiClient.dio.get(
+        '/api/v1/receipts',
+        queryParameters: {'limit': limit, 'offset': offset},
+        options: Options(
+          receiveTimeout: const Duration(seconds: 8),
+          sendTimeout: const Duration(seconds: 8),
+        ),
+      );
+      return ReceiptListResponse.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapException(e);
+    }
+  }
+
   Future<ConfirmReceiptResponse> confirmReceipt(
     String id,
     ConfirmReceiptRequest request,

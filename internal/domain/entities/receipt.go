@@ -15,6 +15,22 @@ type Receipt struct {
 	UpdatedAt    time.Time
 }
 
+// ReceiptListItem is the trimmed projection returned by the list endpoint.
+// It deliberately omits the image_hash and the full image_url (which can
+// be a long presigned S3 URL) to keep the list payload small for the
+// mobile. The full EditableSummary is fetched lazily when the user
+// taps an item.
+type ReceiptListItem struct {
+	ID           string        `json:"id"`
+	Status       ReceiptStatus `json:"status"`
+	StoreName    string        `json:"store_name"`
+	PurchaseDate *string       `json:"purchase_date,omitempty"`
+	Total        *float64      `json:"total,omitempty"`
+	ItemCount    int           `json:"item_count"`
+	CreatedAt    time.Time     `json:"created_at"`
+	ImageURL     string        `json:"image_url"`
+}
+
 type ReceiptItem struct {
 	ID             string
 	ReceiptID      string

@@ -12,6 +12,7 @@ func NewRouter(
 	authHandler *AuthHandler,
 	profileHandler *ProfileHandler,
 	rankingHandler *RankingHandler,
+	loyaltyHandler *LoyaltyHandler,
 	registerReceiptRoutes func(chi.Router),
 	jwtMiddleware func(http.Handler) http.Handler,
 ) http.Handler {
@@ -35,7 +36,12 @@ func NewRouter(
 
 			authed.Get("/auth/me", authHandler.Me)
 			authed.Get("/users/me/points", profileHandler.GetPoints)
+			if loyaltyHandler != nil {
+				authed.Get("/me/loyalty", loyaltyHandler.GetLoyalty)
+			}
 			authed.Get("/ranking/products/search", rankingHandler.Search)
+			authed.Get("/products/{id}/prices", rankingHandler.ProductPrices)
+			authed.Get("/search", rankingHandler.SearchV2)
 
 			if registerReceiptRoutes != nil {
 				registerReceiptRoutes(authed)

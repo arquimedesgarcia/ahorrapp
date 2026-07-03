@@ -68,7 +68,19 @@ func main() {
 	ocrQueue := redis.NewOCRQueue(redisClient, cfg.OCRQueueKey)
 	receiptUploadUC := usecase.NewReceiptUploadUseCase(receiptRepo, storageClient, ocrQueue)
 	receiptGetUC := usecase.NewReceiptGetUseCase(receiptRepo)
-	receiptConfirmUC := usecase.NewReceiptConfirmUseCase(receiptRepo, events.NewLogger())
+	receiptListUC := usecase.NewReceiptListUseCase(receiptRepo)
+	priceAggregateRepo := postgres.NewPriceAggregateRepository(pgPool)
+	recomputeUC := usecase.NewPriceAggregateRecomputeUseCase(priceAggregateRepo)
+	loyaltyRepo := postgres.NewLoyaltyRepository(pgPool)
+	firstObsRepo := postgres.NewFirstObservationRepository(pgPool)
+	loyaltyAwardUC := usecase.NewLoyaltyAwardUseCase(
+		loyaltyRepo,
+		cfg.LoyaltyBasePoints,
+		cfg.LoyaltyFirstObservationBonus,
+		cfg.LoyaltyDataCompletionBonus,
+		cfg.LoyaltyDailyAwardCap,
+	)
+	receiptConfirmUC := usecase.NewReceiptConfirmUseCase(receiptRepo, events.NewLogger(), recomputeUC, loyaltyAwardUC, firstObsRepo)
 	receiptProcessUC := usecase.NewReceiptProcessUseCase(receiptRepo, ocrClient)
 	worker := usecase.NewReceiptWorker(ocrQueue, receiptProcessUC)
 
@@ -80,18 +92,22 @@ func main() {
 	bcryptHasher := crypto.NewBcryptHasher()
 	tokenService := jwt.NewTokenService(cfg.JWTSecret)
 	authUC := usecase.NewAuthUseCase(userRepo, bcryptHasher, tokenService)
-	profileUC := usecase.NewProfileUseCase(userRepo)
+	profileUC := usecase.NewProfileUseCase(userRepo, loyaltyRepo)
 
 	healthHandler := httpapi.NewHealthHandler(healthUC)
 	authHandler := httpapi.NewAuthHandler(authUC)
 	profileHandler := httpapi.NewProfileHandler(profileUC)
-	rankingHandler := httpapi.NewRankingHandler()
-	receiptHandler := httpapi.NewReceiptHandler(receiptUploadUC, receiptGetUC, receiptConfirmUC)
+	rankingUC := usecase.NewRankingUseCase(priceAggregateRepo)
+	rankingHandler := httpapi.NewRankingHandler(rankingUC)
+	loyaltyQueryUC := usecase.NewLoyaltyQueryUseCase(loyaltyRepo)
+	loyaltyHandler := httpapi.NewLoyaltyHandler(loyaltyQueryUC)
+	receiptHandler := httpapi.NewReceiptHandler(receiptUploadUC, receiptGetUC, receiptListUC, receiptConfirmUC)
 	router := httpapi.NewRouter(
 		healthHandler,
 		authHandler,
 		profileHandler,
 		rankingHandler,
+		loyaltyHandler,
 		receiptHandler.RegisterRoutes,
 		httpapi.JWTMiddleware(tokenService),
 	)

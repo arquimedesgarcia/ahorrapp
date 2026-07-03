@@ -3,6 +3,8 @@ package httpapi
 import (
 	"net/http"
 
+	"ahorrapp/internal/usecase"
+
 	"github.com/go-chi/chi/v5"
 )
 
@@ -13,7 +15,8 @@ func newTestRouter(healthHandler http.Handler, registerReceiptRoutes func(chi.Ro
 		healthHandler,
 		NewAuthHandler(nil),
 		NewProfileHandler(nil),
-		NewRankingHandler(),
+		NewRankingHandler(usecase.NewRankingUseCase(nil)),
+		nil,
 		registerReceiptRoutes,
 		JWTMiddleware(stubTokenService{}),
 	)

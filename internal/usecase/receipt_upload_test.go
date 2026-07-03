@@ -33,11 +33,14 @@ func (s *uploadRepoStub) MarkNeedsReview(context.Context, string, entities.Edita
 func (s *uploadRepoStub) ConfirmReceipt(context.Context, string, string, entities.ConfirmPayload, []entities.PriceObservation) error {
 	panic("not used")
 }
-func (s *uploadRepoStub) ResolveOrCreateStore(context.Context, entities.StoreSummary) (string, error) {
+func (s *uploadRepoStub) ResolveOrCreateStore(context.Context, entities.StoreSummary) (string, bool, error) {
 	panic("not used")
 }
 func (s *uploadRepoStub) NormalizeProduct(context.Context, string) (string, string, error) {
-	panic("not used")
+	return "p-1", "milk", nil
+}
+func (s *uploadRepoStub) ListByUser(context.Context, string, int, int) ([]entities.ReceiptListItem, error) {
+	return nil, nil
 }
 
 type storageStub struct{}

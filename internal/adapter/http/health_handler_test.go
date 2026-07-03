@@ -41,7 +41,8 @@ func TestHealthHandler_ReturnsStatusAndDependencies(t *testing.T) {
 		h,
 		NewAuthHandler(nil),
 		NewProfileHandler(nil),
-		NewRankingHandler(),
+		NewRankingHandler(usecase.NewRankingUseCase(nil)),
+		nil,
 		nil,
 		JWTMiddleware(stubTokenService{}),
 	)

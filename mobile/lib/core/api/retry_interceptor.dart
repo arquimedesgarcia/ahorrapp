@@ -2,14 +2,14 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 
-/// Retries failed requests with exponential backoff (1s, 2s, 4s).
+/// Retries failed requests with short exponential backoff (500ms, 1s).
 ///
 /// Only retries on transient failures: network errors and 5xx responses.
 /// Reuses the same [Dio] instance that owns the interceptor chain so the
 /// original [BaseOptions.baseUrl], timeouts and other interceptors are
 /// preserved across retries.
 class RetryInterceptor extends Interceptor {
-  RetryInterceptor({required this.dio, this.maxRetries = 3});
+  RetryInterceptor({required this.dio, this.maxRetries = 2});
 
   final Dio dio;
   final int maxRetries;
@@ -26,7 +26,7 @@ class RetryInterceptor extends Interceptor {
       return;
     }
 
-    final backoff = Duration(seconds: 1 << retryCount);
+    final backoff = Duration(milliseconds: 500 << retryCount);
     await Future<void>.delayed(backoff);
 
     err.requestOptions.extra['retryCount'] = retryCount + 1;

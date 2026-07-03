@@ -26,12 +26,12 @@ func (s getStub) Execute(context.Context, string, string) (*entities.EditableSum
 
 type confirmStub struct{}
 
-func (s confirmStub) Execute(context.Context, string, string, entities.ConfirmPayload) error {
-	return nil
+func (s confirmStub) Execute(context.Context, string, string, entities.ConfirmPayload) (usecase.ConfirmResult, error) {
+	return usecase.ConfirmResult{}, nil
 }
 
 func TestReceiptUploadHandler_AcceptsMultipart(t *testing.T) {
-	h := NewReceiptHandler(uploadStub{}, getStub{}, confirmStub{})
+	h := NewReceiptHandler(uploadStub{}, getStub{}, listNoopStub{}, confirmStub{})
 	router := newTestRouter(NewHealthHandler(fakeHealthUseCase{}), h.RegisterRoutes)
 
 	var body bytes.Buffer

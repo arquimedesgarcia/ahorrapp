@@ -151,3 +151,60 @@ class ConfirmReceiptResponse {
     );
   }
 }
+
+class ReceiptListItem {
+  const ReceiptListItem({
+    required this.id,
+    required this.status,
+    required this.storeName,
+    required this.purchaseDate,
+    required this.total,
+    required this.itemCount,
+    required this.createdAt,
+    required this.imageUrl,
+  });
+
+  final String id;
+  final String status;
+  final String storeName;
+  final String? purchaseDate;
+  final double? total;
+  final int itemCount;
+  final DateTime createdAt;
+  final String imageUrl;
+
+  factory ReceiptListItem.fromJson(Map<String, dynamic> json) {
+    final created = json['created_at'];
+    DateTime createdAt;
+    if (created is String) {
+      createdAt = DateTime.tryParse(created) ?? DateTime.now();
+    } else {
+      createdAt = DateTime.now();
+    }
+    return ReceiptListItem(
+      id: json['id'] as String,
+      status: json['status'] as String? ?? 'PENDING',
+      storeName: json['store_name'] as String? ?? 'Sin tienda',
+      purchaseDate: json['purchase_date'] as String?,
+      total: (json['total'] as num?)?.toDouble(),
+      itemCount: json['item_count'] as int? ?? 0,
+      createdAt: createdAt,
+      imageUrl: json['image_url'] as String? ?? '',
+    );
+  }
+}
+
+class ReceiptListResponse {
+  const ReceiptListResponse({required this.items});
+
+  final List<ReceiptListItem> items;
+
+  factory ReceiptListResponse.fromJson(Map<String, dynamic> json) {
+    final raw = json['items'] as List<dynamic>? ?? const [];
+    return ReceiptListResponse(
+      items: raw
+          .map((e) => ReceiptListItem.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}

@@ -12,7 +12,13 @@ class ProfileApiClient {
 
   Future<PointsResponse> getPoints() async {
     try {
-      final response = await _apiClient.dio.get('/api/v1/users/me/points');
+      final response = await _apiClient.dio.get(
+        '/api/v1/users/me/points',
+        options: Options(
+          receiveTimeout: const Duration(seconds: 6),
+          sendTimeout: const Duration(seconds: 4),
+        ),
+      );
       return PointsResponse.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       final status = e.response?.statusCode;

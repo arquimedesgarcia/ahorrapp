@@ -18,4 +18,5 @@ type LoyaltyTransaction struct {
 	Points    int
 	Reason    string
 	CreatedAt time.Time
+	ReceiptID *string
 }
