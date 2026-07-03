@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 
@@ -11,35 +10,33 @@ import (
 func (h *ReceiptHandler) uploadReceipt(w http.ResponseWriter, r *http.Request) {
 	userID := userIDFromRequest(r)
 	if userID == "" {
-		http.Error(w, "missing user id", http.StatusUnauthorized)
+		writeError(w, http.StatusUnauthorized, "invalid or expired token")
 		return
 	}
 
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		http.Error(w, "invalid multipart form", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid multipart form")
 		return
 	}
 
 	file, _, err := r.FormFile("image")
 	if err != nil {
-		http.Error(w, "image file is required", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "image file is required")
 		return
 	}
 	defer file.Close()
 
 	data, err := io.ReadAll(file)
 	if err != nil {
-		http.Error(w, "unable to read image file", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "unable to read image file")
 		return
 	}
 
 	out, err := h.upload.Execute(r.Context(), usecase.UploadInput{UserID: userID, Data: data})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted)
-	_ = json.NewEncoder(w).Encode(out)
+	writeJSON(w, http.StatusAccepted, out)
 }

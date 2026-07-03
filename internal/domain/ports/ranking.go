@@ -2,9 +2,16 @@ package ports
 
 import (
 	"context"
+	"errors"
 
 	"ahorrapp/internal/domain/entities"
 )
+
+// ErrProductNotFound is returned by RankingRepository.GetProductName
+// (and propagated through the use case) when the requested product id
+// does not exist. The handler maps this to HTTP 404. Using a typed
+// error keeps the handler free of string matching on error text.
+var ErrProductNotFound = errors.New("product not found")
 
 type RankingQueryOptions struct {
 	Lat      *float64

@@ -80,7 +80,7 @@ func main() {
 		cfg.LoyaltyDataCompletionBonus,
 		cfg.LoyaltyDailyAwardCap,
 	)
-	receiptConfirmUC := usecase.NewReceiptConfirmUseCase(receiptRepo, events.NewLogger(), recomputeUC, loyaltyAwardUC, firstObsRepo)
+	receiptConfirmUC := usecase.NewReceiptConfirmUseCase(receiptRepo, events.NewLogger(), recomputeUC, loyaltyAwardUC, firstObsRepo, cfg.PriceAgeThresholdDays)
 	receiptProcessUC := usecase.NewReceiptProcessUseCase(receiptRepo, ocrClient)
 	worker := usecase.NewReceiptWorker(ocrQueue, receiptProcessUC)
 

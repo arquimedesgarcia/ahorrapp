@@ -63,7 +63,7 @@ func sampleConfirmedReceipt() entities.Receipt {
 }
 
 func basePayload() entities.ConfirmPayload {
-	cur := "Bs"
+	cur := "Bs."
 	qty := 1.0
 	price := 1.0
 	return entities.ConfirmPayload{

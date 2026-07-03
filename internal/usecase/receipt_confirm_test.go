@@ -47,7 +47,7 @@ func (e eventsStub) EmitReceiptConfirmed(context.Context, string, string, int) e
 
 func TestReceiptConfirmUseCase_RejectsItemWithoutCurrency(t *testing.T) {
 	recomputeUC := NewPriceAggregateRecomputeUseCase(&stubRankingRepo{})
-	uc := NewReceiptConfirmUseCase(confirmRepoStub{}, eventsStub{}, recomputeUC, nil, nil)
+	uc := NewReceiptConfirmUseCase(confirmRepoStub{}, eventsStub{}, recomputeUC, nil, nil, 90)
 
 	_, err := uc.Execute(context.Background(), "r-1", "u-1", entities.ConfirmPayload{
 		Store:        entities.StoreSummary{Name: "Store"},
@@ -67,9 +67,9 @@ func TestReceiptConfirmUseCase_ReturnsPointsEarned(t *testing.T) {
 	recomputeUC := NewPriceAggregateRecomputeUseCase(&stubRankingRepo{})
 	loyaltyRepo := &fakeLoyaltyRepo{}
 	loyaltyUC := NewLoyaltyAwardUseCase(loyaltyRepo, 10, 5, 3, 0)
-	uc := NewReceiptConfirmUseCase(confirmRepoStub{}, eventsStub{}, recomputeUC, loyaltyUC, nil)
+	uc := NewReceiptConfirmUseCase(confirmRepoStub{}, eventsStub{}, recomputeUC, loyaltyUC, nil, 90)
 
-	cur := "Bs"
+	cur := "Bs."
 	result, err := uc.Execute(context.Background(), "r-1", "u-1", entities.ConfirmPayload{
 		Store:        entities.StoreSummary{Name: "Store"},
 		PurchaseDate: "2026-06-24",

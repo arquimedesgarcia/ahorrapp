@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -10,12 +11,27 @@ import (
 	"ahorrapp/internal/domain/ports"
 )
 
+// validCurrencies is the closed set enforced by the price_aggregates
+// and receipt_items CHECK constraints (see migrations/000004 and the
+// 000003 schema). Validating here gives a clear 400 error instead of
+// letting the DB reject with an opaque constraint violation.
+var validCurrencies = map[string]struct{}{
+	"USD": {},
+	"Bs.": {},
+}
+
+func isValidCurrency(c string) bool {
+	_, ok := validCurrencies[c]
+	return ok
+}
+
 type ReceiptConfirmUseCase struct {
-	repo      ports.ReceiptRepository
-	events    ports.ReceiptEvents
-	recompute *PriceAggregateRecomputeUseCase
-	loyalty   *LoyaltyAwardUseCase
-	firstObs  ports.FirstObservationChecker
+	repo                  ports.ReceiptRepository
+	events                ports.ReceiptEvents
+	recompute             *PriceAggregateRecomputeUseCase
+	loyalty               *LoyaltyAwardUseCase
+	firstObs              ports.FirstObservationChecker
+	priceAgeThresholdDays int
 }
 
 func NewReceiptConfirmUseCase(
@@ -24,13 +40,18 @@ func NewReceiptConfirmUseCase(
 	recompute *PriceAggregateRecomputeUseCase,
 	loyalty *LoyaltyAwardUseCase,
 	firstObs ports.FirstObservationChecker,
+	priceAgeThresholdDays int,
 ) *ReceiptConfirmUseCase {
+	if priceAgeThresholdDays < 1 {
+		priceAgeThresholdDays = 90
+	}
 	return &ReceiptConfirmUseCase{
-		repo:      repo,
-		events:    events,
-		recompute: recompute,
-		loyalty:   loyalty,
-		firstObs:  firstObs,
+		repo:                  repo,
+		events:                events,
+		recompute:             recompute,
+		loyalty:               loyalty,
+		firstObs:              firstObs,
+		priceAgeThresholdDays: priceAgeThresholdDays,
 	}
 }
 
@@ -84,6 +105,10 @@ func (u *ReceiptConfirmUseCase) Execute(ctx context.Context, receiptID, userID s
 		if item.Currency == nil || strings.TrimSpace(*item.Currency) == "" {
 			return ConfirmResult{}, fmt.Errorf("item currency is required")
 		}
+		normalizedCurrency := strings.TrimSpace(*item.Currency)
+		if !isValidCurrency(normalizedCurrency) {
+			return ConfirmResult{}, fmt.Errorf("item currency %q is not supported (expected USD or Bs.)", normalizedCurrency)
+		}
 		productID, _, err := u.repo.NormalizeProduct(ctx, item.RawText)
 		if err != nil {
 			return ConfirmResult{}, err
@@ -92,7 +117,7 @@ func (u *ReceiptConfirmUseCase) Execute(ctx context.Context, receiptID, userID s
 			ProductID:  productID,
 			StoreID:    storeID,
 			UnitPrice:  *item.UnitPrice,
-			Currency:   strings.TrimSpace(*item.Currency),
+			Currency:   normalizedCurrency,
 			ObservedAt: now,
 			ReceiptID:  receiptID,
 		})
@@ -135,25 +160,38 @@ func (u *ReceiptConfirmUseCase) Execute(ctx context.Context, receiptID, userID s
 	}
 
 	if u.recompute != nil {
-		if err := u.recompute.Execute(ctx, observations, 90); err != nil {
-			return ConfirmResult{}, fmt.Errorf("recompute aggregates: %w", err)
+		// Recompute failure MUST NOT fail the confirm flow: the receipt
+		// is already persisted as CONFIRMED, the price_observations are
+		// already stored, and the next confirm will fix the aggregates.
+		// Returning an error here would leave the mobile app retrying
+		// against a row that is already CONFIRMED, producing duplicate
+		// observations. Log and continue.
+		if err := u.recompute.Execute(ctx, observations, u.priceAgeThresholdDays); err != nil {
+			log.Printf("receipt confirm: recompute aggregates for %s failed: %v (price_aggregates will be stale until next confirm)", receiptID, err)
 		}
 	}
 
 	var pointsEarned int
 	var reasons []string
 	if u.loyalty != nil {
-		// Fetch the freshly-confirmed receipt so the award sees the
-		// CONFIRMED status that the persistence layer just set.
-		if receipt, err := u.repo.GetByID(ctx, receiptID); err == nil && receipt != nil {
-			awardInput := AwardInput{
-				Receipt:                   *receipt,
-				Payload:                   payload,
-				StoreCreatedNow:           storeCreatedNow,
-				FirstObservationPairCount: firstObservationPairCount,
-			}
-			pointsEarned, reasons = u.loyalty.AwardForReceipt(ctx, awardInput)
+		// Build the AwardInput directly from what we already know in
+		// memory: the receipt was just transitioned to CONFIRMED inside
+		// the ConfirmReceipt tx, so the status is known and the
+		// user_id is the same one passed into this use case. This
+		// eliminates the post-commit GetByID round trip (and the small
+		// window in which it could return a row whose status was
+		// reverted by a concurrent operation).
+		awardInput := AwardInput{
+			Receipt: entities.Receipt{
+				ID:     receiptID,
+				UserID: userID,
+				Status: entities.ReceiptStatusConfirmed,
+			},
+			Payload:                   payload,
+			StoreCreatedNow:           storeCreatedNow,
+			FirstObservationPairCount: firstObservationPairCount,
 		}
+		pointsEarned, reasons = u.loyalty.AwardForReceipt(ctx, awardInput)
 	}
 
 	if u.events != nil {

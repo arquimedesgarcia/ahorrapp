@@ -57,12 +57,17 @@ UPDATE users SET points = points + $2, updated_at = NOW() WHERE id::text = $1
 
 func (r *LoyaltyRepository) DailyGrantCount(ctx context.Context, userID string) (int, error) {
 	var count int
+	// Day boundary MUST be in UTC so the cap is consistent with the
+	// receipt confirmation time stamped in `now.UTC()` by the use case.
+	// Using the DB server's local timezone here would let users bypass
+	// the cap simply by confirming receipts near midnight in a non-UTC
+	// timezone.
 	err := r.pool.QueryRow(ctx, `
 SELECT COUNT(DISTINCT receipt_id)
 FROM loyalty_transactions
 WHERE user_id::text = $1
   AND points > 0
-  AND created_at >= date_trunc('day', NOW())
+  AND created_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')
 `, userID).Scan(&count)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

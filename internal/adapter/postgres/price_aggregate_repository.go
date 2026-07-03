@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"ahorrapp/internal/domain/entities"
 	"ahorrapp/internal/domain/ports"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -39,15 +41,30 @@ func (r *PriceAggregateRepository) RecomputeAggregate(
 	WHERE product_id = $1::uuid
 	  AND store_id = $2::uuid
 	  AND currency = $3
-	  AND observed_at >= NOW() - ($4 || ' days')::interval
+	  AND observed_at >= NOW() - make_interval(days => $4)
 	`
 
 	var avg, min float64
 	var count int
 	var lastObserved time.Time
-	err := r.pool.QueryRow(ctx, query, productID, storeID, currency, fmt.Sprintf("%d", ageThresholdDays)).Scan(&avg, &min, &count, &lastObserved)
+	err := r.pool.QueryRow(ctx, query, productID, storeID, currency, ageThresholdDays).Scan(&avg, &min, &count, &lastObserved)
 	if err != nil {
 		return fmt.Errorf("query observations: %w", err)
+	}
+
+	// No fresh observations: drop the cached row so the ranking does
+	// not display stale data. Upserting a (count=0, avg=0, min=0) row
+	// would pollute the table and the ranking query already filters
+	// sample_count > 0, but DELETE is the cleaner source of truth.
+	if count == 0 {
+		_, err = r.pool.Exec(ctx, `
+		DELETE FROM price_aggregates
+		WHERE product_id = $1::uuid AND store_id = $2::uuid AND currency = $3
+		`, productID, storeID, currency)
+		if err != nil {
+			return fmt.Errorf("delete stale aggregate: %w", err)
+		}
+		return nil
 	}
 
 	upsert := `
@@ -73,7 +90,11 @@ func (r *PriceAggregateRepository) RecomputeAll(ctx context.Context, ageThreshol
 		ageThresholdDays = 90
 	}
 
-	query := `
+	// Two-step recompute so the resulting table contains only rows
+	// that have at least one fresh observation. INSERT ... ON CONFLICT
+	// cannot represent "delete when the new row would be empty", so we
+	// first aggregate, then delete the rows that fell out of the window.
+	insertQuery := `
 	INSERT INTO price_aggregates (product_id, store_id, currency, average_price, min_price, sample_count, last_observed_at, updated_at)
 	SELECT
 		product_id,
@@ -84,7 +105,7 @@ func (r *PriceAggregateRepository) RecomputeAll(ctx context.Context, ageThreshol
 		COUNT(*),
 		MAX(observed_at)
 	FROM price_observations
-	WHERE observed_at >= NOW() - ($1 || ' days')::interval
+	WHERE observed_at >= NOW() - make_interval(days => $1)
 	GROUP BY product_id, store_id, currency
 	ON CONFLICT (product_id, store_id, currency)
 	DO UPDATE SET
@@ -94,9 +115,21 @@ func (r *PriceAggregateRepository) RecomputeAll(ctx context.Context, ageThreshol
 		last_observed_at = EXCLUDED.last_observed_at,
 		updated_at       = NOW()
 	`
-	_, err := r.pool.Exec(ctx, query, fmt.Sprintf("%d", ageThresholdDays))
-	if err != nil {
+	if _, err := r.pool.Exec(ctx, insertQuery, ageThresholdDays); err != nil {
 		return fmt.Errorf("recompute all aggregates: %w", err)
+	}
+	// Drop rows whose only observations have aged out of the window.
+	if _, err := r.pool.Exec(ctx, `
+	DELETE FROM price_aggregates pa
+	WHERE NOT EXISTS (
+	  SELECT 1 FROM price_observations po
+	  WHERE po.product_id = pa.product_id
+	    AND po.store_id = pa.store_id
+	    AND po.currency = pa.currency
+	    AND po.observed_at >= NOW() - make_interval(days => $1)
+	)
+	`, ageThresholdDays); err != nil {
+		return fmt.Errorf("prune stale aggregates: %w", err)
 	}
 	return nil
 }
@@ -150,9 +183,14 @@ func (r *PriceAggregateRepository) getProductRankingWithProximity(
 		return r.getProductRankingDefault(ctx, productID, opts)
 	}
 
-	userPoint := fmt.Sprintf("ST_MakePoint(%f, %f)::geography", *opts.Long, *opts.Lat)
+	// All numeric inputs are passed as $N parameters; no string
+	// interpolation of user data into the SQL. The user point is
+	// expressed via ST_MakePoint(long, lat) per the PostGIS convention
+	// (longitude first).
+	userPoint := "ST_MakePoint($2, $3)::geography"
 
 	var query string
+	args := []any{productID, *opts.Long, *opts.Lat}
 	if opts.HasRadius() && opts.RadiusKm != nil {
 		query = fmt.Sprintf(`
 			SELECT
@@ -173,13 +211,14 @@ func (r *PriceAggregateRepository) getProductRankingWithProximity(
 			JOIN stores s ON s.id = pa.store_id
 			WHERE pa.product_id = $1::uuid
 			  AND pa.sample_count > 0
-			  AND (s.geo IS NULL OR ST_DWithin(s.geo, %s, %f))
+			  AND (s.geo IS NULL OR ST_DWithin(s.geo, %s, $4))
 			ORDER BY
 				CASE WHEN distance_km IS NULL THEN 1 ELSE 0 END,
 				distance_km ASC,
 				pa.average_price ASC,
 				s.name ASC
-			`, userPoint, userPoint, *opts.RadiusKm*1000)
+			`, userPoint, userPoint)
+		args = append(args, *opts.RadiusKm*1000)
 	} else {
 		query = fmt.Sprintf(`
 			SELECT
@@ -208,7 +247,25 @@ func (r *PriceAggregateRepository) getProductRankingWithProximity(
 			`, userPoint)
 	}
 
-	return r.queryRanking(ctx, query, productID)
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query ranking with proximity: %w", err)
+	}
+	defer rows.Close()
+
+	var results []entities.PriceAggregate
+	for rows.Next() {
+		var agg entities.PriceAggregate
+		var branch *string
+		var distanceKm *float64
+		if err := rows.Scan(&agg.StoreID, &agg.StoreName, &branch, &agg.Currency, &agg.AveragePrice, &agg.MinPrice, &agg.SampleCount, &agg.LastObservedAt, &distanceKm); err != nil {
+			return nil, fmt.Errorf("scan ranking row: %w", err)
+		}
+		agg.Branch = branch
+		agg.DistanceKm = distanceKm
+		results = append(results, agg)
+	}
+	return results, rows.Err()
 }
 
 func (r *PriceAggregateRepository) queryRanking(ctx context.Context, query, productID string) ([]entities.PriceAggregate, error) {
@@ -304,7 +361,6 @@ func (r *PriceAggregateRepository) SearchProducts(
 				return nil, fmt.Errorf("scan best price: %w", err)
 			}
 			agg.ProductID = m.id
-			agg.ProductID = m.id
 			agg.Branch = branch
 			if existing, ok := bestPrices[agg.Currency]; !ok {
 				bestPrices[agg.Currency] = &agg
@@ -331,6 +387,9 @@ func (r *PriceAggregateRepository) GetProductName(ctx context.Context, productID
 	var name string
 	err := r.pool.QueryRow(ctx, `SELECT canonical_name FROM products WHERE id = $1::uuid`, productID).Scan(&name)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ports.ErrProductNotFound
+		}
 		return "", fmt.Errorf("get product name: %w", err)
 	}
 	return name, nil

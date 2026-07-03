@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -35,24 +36,39 @@ func (h *RankingHandler) ProductPrices(w http.ResponseWriter, r *http.Request) {
 
 	opts := ports.RankingQueryOptions{}
 	if latStr := r.URL.Query().Get("lat"); latStr != "" {
-		if lat, err := strconv.ParseFloat(latStr, 64); err == nil {
-			opts.Lat = &lat
+		lat, err := strconv.ParseFloat(latStr, 64)
+		if err != nil || lat < -90 || lat > 90 {
+			writeError(w, http.StatusBadRequest, "invalid lat parameter (expected -90..90)")
+			return
 		}
+		opts.Lat = &lat
 	}
 	if longStr := r.URL.Query().Get("long"); longStr != "" {
-		if long, err := strconv.ParseFloat(longStr, 64); err == nil {
-			opts.Long = &long
+		long, err := strconv.ParseFloat(longStr, 64)
+		if err != nil || long < -180 || long > 180 {
+			writeError(w, http.StatusBadRequest, "invalid long parameter (expected -180..180)")
+			return
 		}
+		opts.Long = &long
 	}
 	if radiusStr := r.URL.Query().Get("radius_km"); radiusStr != "" {
-		if radius, err := strconv.ParseFloat(radiusStr, 64); err == nil {
-			opts.RadiusKm = &radius
+		radius, err := strconv.ParseFloat(radiusStr, 64)
+		if err != nil || radius <= 0 {
+			writeError(w, http.StatusBadRequest, "invalid radius_km parameter (expected > 0)")
+			return
 		}
+		opts.RadiusKm = &radius
+	}
+	// lat and long must be provided together; partial proximity is
+	// rejected so the ranking never silently drops one coordinate.
+	if (opts.Lat == nil) != (opts.Long == nil) {
+		writeError(w, http.StatusBadRequest, "lat and long must be provided together")
+		return
 	}
 
 	resp, err := h.uc.GetProductRanking(r.Context(), productID, opts)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "no rows") {
+		if errors.Is(err, ports.ErrProductNotFound) {
 			writeError(w, http.StatusNotFound, "product not found")
 			return
 		}

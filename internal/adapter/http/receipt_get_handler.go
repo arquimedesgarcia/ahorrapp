@@ -12,23 +12,23 @@ import (
 func (h *ReceiptHandler) getReceipt(w http.ResponseWriter, r *http.Request) {
 	userID := userIDFromRequest(r)
 	if userID == "" {
-		http.Error(w, "missing user id", http.StatusUnauthorized)
+		writeError(w, http.StatusUnauthorized, "invalid or expired token")
 		return
 	}
 
 	id := chi.URLParam(r, "id")
 	if id == "" {
-		http.Error(w, "receipt id required", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "receipt id is required")
 		return
 	}
 
 	summary, err := h.get.Execute(r.Context(), id, userID)
 	if err != nil {
-		http.Error(w, "fetch receipt: "+err.Error(), http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "fetch receipt: "+err.Error())
 		return
 	}
 	if summary == nil {
-		http.Error(w, "receipt not found", http.StatusNotFound)
+		writeError(w, http.StatusNotFound, "receipt not found")
 		return
 	}
 
@@ -38,26 +38,32 @@ func (h *ReceiptHandler) getReceipt(w http.ResponseWriter, r *http.Request) {
 func (h *ReceiptHandler) listReceipts(w http.ResponseWriter, r *http.Request) {
 	userID := userIDFromRequest(r)
 	if userID == "" {
-		http.Error(w, "missing user id", http.StatusUnauthorized)
+		writeError(w, http.StatusUnauthorized, "invalid or expired token")
 		return
 	}
 
 	limit := 20
 	offset := 0
 	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			limit = n
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 {
+			writeError(w, http.StatusBadRequest, "invalid limit parameter")
+			return
 		}
+		limit = n
 	}
 	if v := r.URL.Query().Get("offset"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
-			offset = n
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			writeError(w, http.StatusBadRequest, "invalid offset parameter")
+			return
 		}
+		offset = n
 	}
 
 	items, err := h.list.Execute(r.Context(), userID, limit, offset)
 	if err != nil {
-		http.Error(w, "list receipts: "+err.Error(), http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "list receipts: "+err.Error())
 		return
 	}
 	if items == nil {

@@ -8,6 +8,7 @@ import (
 	"ahorrapp/internal/domain/entities"
 	"ahorrapp/internal/domain/ports"
 
+	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -105,29 +106,14 @@ LIMIT $2
 	return out, nil
 }
 
-// isUniqueViolation checks if the error is a Postgres unique constraint violation.
+// isUniqueViolation checks if the error is a Postgres unique constraint
+// violation (SQLSTATE 23505). Uses the typed *pgconn.PgError so the
+// detection is exact and immune to false positives from any error
+// message that happens to contain the words "unique" or "duplicate".
 func isUniqueViolation(err error) bool {
 	if err == nil {
 		return false
 	}
-	// pgx wraps pq errors; check the error code 23505 (unique_violation)
-	return containsAny(err.Error(), "23505", "unique", "duplicate key")
-}
-
-func containsAny(s string, subs ...string) bool {
-	for _, sub := range subs {
-		if len(s) >= len(sub) && (s == sub || indexOf(s, sub) >= 0) {
-			return true
-		}
-	}
-	return false
-}
-
-func indexOf(s, sub string) int {
-	for i := 0; i+len(sub) <= len(s); i++ {
-		if s[i:i+len(sub)] == sub {
-			return i
-		}
-	}
-	return -1
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
